@@ -1,0 +1,3 @@
+# tested with python 3.9
+sktime>=0.16.1
+packaging
