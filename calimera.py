@@ -1,6 +1,6 @@
 import numpy as np
 
-from sktime.transformations.panel.rocket import MiniRocket
+from sktime.transformations.panel.rocket import MiniRocketMultivariate
 from sklearn.linear_model import RidgeClassifierCV
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.calibration import CalibratedClassifierCV
@@ -14,7 +14,7 @@ class CALIMERA:
         NUM_TIMESTAMPS = 20
         num_intervals_between_timestamps = min(NUM_TIMESTAMPS-1, max_timestamp)
         step = max_timestamp // num_intervals_between_timestamps
-        timestamps = np.arange(step, max_timestamp+step, step).astype(np.int32)
+        timestamps = np.arange(max(2, step), max_timestamp+step, step).astype(np.int32)
         timestamps[-1] = max_timestamp
         return timestamps
 
@@ -22,19 +22,17 @@ class CALIMERA:
         extractors = []
         for timestamp in timestamps:
             if timestamp < 9:
-                extractors.append(lambda x: x.reshape(x.shape[0], x.shape[2]))
+                extractors.append(lambda x: x.reshape(x.shape[0], -1))
             else:
-                X_sub = X[:, :timestamp]
-                X_sub = X_sub.reshape(X_sub.shape[0], 1, -1)
-                extractors.append(MiniRocket().fit(X_sub).transform)
+                X_sub = X[:, :, :timestamp]
+                extractors.append(MiniRocketMultivariate().fit(X_sub).transform)
         return extractors
 
     def _get_features(X, feature_extractors, timestamps):
         features = [[] for i in range(timestamps.shape[0])]
         for i in range(timestamps.shape[0]):
             timestamp = timestamps[i]
-            X_sub = X[:, :timestamp]
-            X_sub = X_sub.reshape(X_sub.shape[0], 1, -1)
+            X_sub = X[:, :, :timestamp]
             feature = feature_extractors[i](X_sub)
             features[i] = np.asarray(feature)
             features[i] = features[i].reshape(features[i].shape[0], -1)
@@ -63,8 +61,7 @@ class CALIMERA:
         return np.asarray(predictors), np.asarray(costs)
 
     def fit(self, X_train, labels):
-        timestamps = CALIMERA._generate_timestamps(max_timestamp=X_train.shape[1])
-
+        timestamps = CALIMERA._generate_timestamps(max_timestamp=X_train.shape[-1])
         self.feature_extractors = CALIMERA._learn_feature_extractors(X_train, timestamps)
         features_train = CALIMERA._get_features(X_train, self.feature_extractors, timestamps)
         self.classifiers = CALIMERA._learn_classifiers(features_train, labels, timestamps)
@@ -85,8 +82,8 @@ class CALIMERA:
         predicted_y = []
         for j in range(n):
             for t in range(self.timestamps.shape[0]):
-                X_sub = X[j, :self.timestamps[t]]
-                X_sub = X_sub.reshape(1, 1, X_sub.shape[0])
+                X_sub = X[j, :, :self.timestamps[t]]
+                X_sub = X_sub.reshape(1, -1, X_sub.shape[-1])
                 features = np.asarray(self.feature_extractors[t](X_sub))
                 scores = self.classifiers[t].get_scores(features.reshape(1, -1))[0]
                 predictors = _scores_to_predictors(scores)
