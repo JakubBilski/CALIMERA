@@ -170,6 +170,7 @@ class MockupClassifierForPassingValidationDataToSklearnCalibrator:
     def __init__(self, mockup_scores, classes):
         self.mockup_scores = mockup_scores
         self.classes_ = classes
+        self._estimator_type = "classifier"
 
     def fit(self):
         pass

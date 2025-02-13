@@ -1,3 +1,4 @@
 # tested with python 3.9
-sktime>=0.16.1
+sktime>=0.36
+scikit-learn<=1.6
 packaging
